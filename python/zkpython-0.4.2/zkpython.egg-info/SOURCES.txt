@@ -1,0 +1,10 @@
+MANIFEST.in
+README
+pyzk_docstrings.h
+setup.cfg
+setup.py
+zookeeper.c
+zkpython.egg-info/PKG-INFO
+zkpython.egg-info/SOURCES.txt
+zkpython.egg-info/dependency_links.txt
+zkpython.egg-info/top_level.txt

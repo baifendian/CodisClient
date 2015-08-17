@@ -1,0 +1,101 @@
+
+* 2.4 (in development)
+    * WARNING: 2.4 contains several backwards incompatible changes.
+    * Completely refactored Connection objects. Moved much of the Redis
+      protocol packing for requests here, and eliminated the nasty dependencies
+      it had on the client to do AUTH and SELECT commands on connect.
+    * Connection objects now have a parser attribute. Parsers are responsible
+      for reading data Redis sends. Two parsers ship with redis-py: a
+      PythonParser and the HiRedis parser. redis-py will automatically use the
+      HiRedis parser if you have the Python hiredis module installed, otherwise
+      it will fall back to the PythonParser. You can force or the other, or even
+      an external one by passing the `parser_class` argument to ConnectionPool.
+    * Added a UnixDomainSocketConnection for users wanting to talk to the Redis
+      instance running on a local machine only. You can use this connection
+      by passing it to the `connection_class` argument of the ConnectionPool.
+    * Connections no longer derive from threading.local. See threading.local
+      note below.
+    * ConnectionPool has been comletely refactored. The ConnectionPool now
+      maintains a list of connections. The redis-py client only hangs on to
+      a ConnectionPool instance, calling get_connection() anytime it needs to
+      send a command. When get_connection() is called, the command name and
+      any keys involved in the command are passed as arguments. Subclasses of
+      ConnectionPool could use this information to identify the shard the keys
+      belong to and return a connection to it. ConnectionPool also implements
+      disconnect() to force all connections in the pool to disconnect from
+      the Redis server.
+    * redis-py no longer support the SELECT command. You can still connect to
+      a specific database by specifing it when instantiating a client instance
+      or by creating a connection pool. If you need to talk to multiplate
+      databases within your application, you should use a separate client
+      instance for each database you want to talk to.
+    * Completely refactored Publish/Subscribe support. The subscribe and listen
+      commands are no longer available on the redis-py Client class. Instead,
+      the `pubsub` method returns an instance of the PubSub class which contains
+      all publish/subscribe support. Note, you can still PUBLISH from the
+      redis-py client class if you desire.
+    * Removed support for all previously deprecated commands or options.
+    * redis-py no longer uses threading.local in any way. Since the Client
+      class no longer holds on to a connection, it's no longer needed. You can
+      now pass client instances between threads, and commands run on those
+      threads will retrieve an available connection from the pool, use it and
+      release it. It should now be trivial to use redis-py with eventlet or
+      greenlet.
+    * Support Jython, fixing #97. Thanks to Adam Vandenberg for the patch.
+    * Using __getitem__ now properly raises a KeyError when the key is not
+      found. Thanks Ionuț Arțăriși for the patch.
+    * Newer Redis versions return a LOADING message for some commands while
+      the database is loading from disk during server start. This could cause
+      problems with SELECT. We now force a socket disconnection prior to
+      raising a ResponseError so subsuquent connections have to reconnect and
+      re-select the appropriate database. Thanks to Benjamin Anderson for
+      finding this and fixing.
+* 2.2.4
+    * WARNING: Potential backwards incompatible change - Changed order of
+      parameters of ZREVRANGEBYSCORE to match those of the actual Redis command.
+      This is only backwards-incompatible if you were passing max and min via
+      keyword args. If passing by normal args, nothing in user code should have
+      to change. Thanks Stéphane Angel for the fix.
+    * Fixed INFO to properly parse the Redis data correctly for both 2.2.x and
+      2.3+. Thanks Stéphane Angel for the fix.
+    * Lock objects now store their timeout value as a float. This allows floats
+      to be used as timeout values. No changes to existing code required.
+    * WATCH now supports multiple keys. Thanks Rich Schumacher.
+    * Broke out some code that was Python 2.4 incompatible. redis-py should
+      now be useable on 2.4, but this hasn't actually been tested. Thanks
+      Dan Colish for the patch.
+    * Optimized some code using izip and islice. Should have a pretty good
+      speed up on larger data sets. Thanks Dan Colish.
+    * Better error handling when submitting an empty mapping to HMSET. Thanks
+      Dan Colish.
+    * Subscription status is now reset after every (re)connection.
+* 2.2.3
+    * Added support for Hiredis. To use, simply "pip install hiredis" or
+      "easy_install hiredis". Thanks for Pieter Noordhuis for the hiredis-py
+      bindings and the patch to redis-py.
+    * The connection class is chosen based on whether hiredis is installed
+      or not. To force the use of the PythonConnection, simply create
+      your own ConnectionPool instance with the connection_class argument
+      assigned to to PythonConnection class.
+    * Added missing command ZREVRANGEBYSCORE. Thanks Jay Baird for the patch.
+    * The INFO command should be parsed correctly on 2.2.x server versions
+      and is backwards compatible with older versions. Thanks Brett Hoerner.
+* 2.2.2
+    * Fixed a bug in ZREVRANK where retriving the rank of a value not in
+      the zset would raise an error.
+    * Fixed a bug in Connection.send where the errno import was getting
+      overwritten by a local variable.
+    * Fixed a bug in SLAVEOF when promoting an existing slave to a master.
+    * Reverted change of download URL back to redis-VERSION.tar.gz. 2.2.1's
+      change of this actually broke Pypi for Pip installs. Sorry!
+* 2.2.1
+    * Changed archive name to redis-py-VERSION.tar.gz to not conflict
+      with the Redis server archive.
+* 2.2.0
+    * Implemented SLAVEOF
+    * Implemented CONFIG as config_get and config_set
+    * Implemented GETBIT/SETBIT
+    * Implemented BRPOPLPUSH
+    * Implemented STRLEN
+    * Implemented PERSIST
+    * Implemented SETRANGE
