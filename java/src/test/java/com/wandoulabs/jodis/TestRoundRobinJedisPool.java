@@ -138,11 +138,11 @@ public class TestRoundRobinJedisPool {
         redis2.start();
         Thread.sleep(2000);
 
-        jedis1 = new Jedis("localhost", redisPort1, "item");
-        jedis2 = new Jedis("localhost", redisPort2, "item");
+        jedis1 = new Jedis("localhost", redisPort1);
+        jedis2 = new Jedis("localhost", redisPort2);
         addNode("node1", redisPort1, "online");
         jodisPool = new RoundRobinJedisPool("localhost:" + zkPort, 5000, zkPath,
-                new JedisPoolConfig(), "item");
+                new JedisPoolConfig());
     }
 
     @After

@@ -35,26 +35,27 @@ redisContext* RedisClientPool::borrowItem()
 	redisContext* rt = NULL;
 	{
 		ScopedLock lock(unUsedMutex_);
-		while (!unUsed_.empty())
 		{
-			rt = unUsed_.front();
-			unUsed_.pop_front();
-			if (rt->err == REDIS_OK)
-			{
-				return rt;
-			}
-			else
-			{
-				redisFree(rt);
-				continue;
-			}
+		    while (!unUsed_.empty())
+		    {
+			    rt = unUsed_.front();
+			    unUsed_.pop_front();
+			    if (rt->err == REDIS_OK)
+			    {
+				    return rt;
+			    }
+			    else
+			    {
+				    redisFree(rt);
+				    continue;
+			    }
+		    }
+		    rt = create();
+		    if (rt != NULL)
+	        {
+		        used_++;
+	        }
 		}
-	}
-	rt = create();
-	if (rt != NULL)
-	{
-		ScopedLock lock(unUsedMutex_);
-		used_++;
 	}
 	return rt;
 }
@@ -120,12 +121,10 @@ redisContext* RedisClientPool::create()
 			ret = NULL;
 			return ret;
 		}
-
 		if (password_ != "")
 		{
 			redisCommand(ret, "AUTH %s", password_.c_str());
 		}
-
 		return ret;
 	} catch (std::exception &e)
 	{
@@ -268,4 +267,3 @@ std::string RedisClientPool::getId()
 
 }
 }
-

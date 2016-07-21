@@ -22,7 +22,8 @@ CXX_OBJS = $(OBJ_DIR)/CodisClient.o \
 			$(OBJ_DIR)/Reply.o \
 			$(OBJ_DIR)/ae.o \
 			$(OBJ_DIR)/zmalloc.o \
-			$(OBJ_DIR)/Command.o
+			$(OBJ_DIR)/Command.o \
+			$(OBJ_DIR)/BfdCodis.o
 			
 $(OBJ_DIR)/%.o:$(SRC_DIR)/%.cpp
 	$(CXX) -c -fPIC -o $@ $< $(INCPATH) $(LFLAGS)
@@ -42,7 +43,7 @@ clean:
 
 .PHONY:test
 test:
-	-rm -f bin/RedisClientTest
+	-rm -f bin/RedisClientDemo
 	make -f CodisClientTest.Makefile
 	export LD_LIBRARY_PATH=./bin/:${LD_LIBRARY_PATH}
-	./bin/CodisClientTest
+	./bin/CodisClientDemo

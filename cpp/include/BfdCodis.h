@@ -1,50 +1,25 @@
 /**
  * @file
  * @brief
- *
  */
 
-#ifndef CODIS_CLIENT_H
-#define CODIS_CLIENT_H
+#ifndef CODISCLIENT_BFDCODIS_H
+#define CODISCLIENT_BFDCODIS_H
 
-#include <string>
-#include <vector>
-#include <map>
-#include "Reply.h"
-#include "Command.h"
-#include "RedisClientPool.h"
-#include <sys/time.h>
+#ifdef setbit
+#undef setbit
+#endif
 
-using namespace std;
+#include "RoundRobinCodisPool.h"
 
-namespace bfd
-{
-namespace codis
-{
+namespace bfd {
+namespace codis {
 
-typedef map<string, string> KVMap;
-
-
-class CodisClient;
-/**
- * @brief mget3
- */
-class MgetAsyncRequestContext
-{
-	// mget过程中，对每个server发起的请求的回调变量
-public:
-	vector<string> user_keylist_;
-	void (*callback)(KVMap& kvs);
-	redisAsyncContext** async_context;
-	CodisClient *client;
-};
-
-class CodisClient
+class BfdCodis
 {
 public:
-	  CodisClient(const string& proxyIP, const int port, const string& businessID);
-	  ~CodisClient();
-	  void returnAsync(redisAsyncContext* async_context) { m_ConnPool->returnItemAsync(async_context);};
+	BfdCodis(const string& zookeeperAddr, const string& proxyPath, const string& businessID);
+	~BfdCodis();
 
 	  /**
 	   * @brief key
@@ -81,7 +56,7 @@ public:
 	  int incr(string key, int tt = 0);
 	  int decr(string key, int tt = 0);
 	  int incrby(string key, int incr, int tt = 0);
-	  int decrby(string key, int incr, int tt = 0);
+	  int decrby(string key, int decr, int tt = 0);
 	  long append(string key, string value, int tt = 0);
 
 	  /**
@@ -150,27 +125,11 @@ public:
 	  Reply RedisCommand(const vector<string>& command, int tt = 0);
 	  Reply RedisCommand(Command& command, int tt = 0);
 	  vector<Reply> RedisCommands(vector<Command>& commands);
-          class myexception: public exception
-          {
-              virtual const char* what() const throw()
-              {
-                  return "Your value is too bigger than 1M";
-              }
-          } myex;
-
 private:
-	  aeEventLoop *m_Loop;
-	  RedisClientPool *m_ConnPool;
-	  string m_BID;
-      string proxy_IP;
-      string proxy_Port;
-
-private:
-	  static void* AEThread(void *arg);
-	  static void mget2Callback(redisAsyncContext *c, void *r, void *privdata);
+	  BfdCodis(const BfdCodis&);
+	  BfdCodis& operator=(const BfdCodis&);
+	  RoundRobinCodisPool *m_Pool;
 };
-
-}
-}
-
+};
+};
 #endif

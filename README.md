@@ -3,63 +3,71 @@
 	codis-client是codis集群的客户端,支持C++,Java,Python
 
 ## 环境依赖 (Python)
-	1.redis-py-2.4(修复了源码中的一个connection的bug)
-	2.zkpython-0.4.2
-	3.zookeeper-c
+	1.redis-py-2.7.2
+	2.hiredis(easy_install  hiredis)-0.2.0
+	3.gcc-4.6.3
+	4.jdk1.7
+	5.python2.7
+	6.kazoo
 	
 ## Install java
-	cd jodis 
+	cd java
 	mvn package
+	生成包为/target/bfdjodis-0.1.2-jar-with-dependencies.jar
 
 ## Install python
 ```python
-	cd zookeeper-3.4.6/src/c/
-	./configure
-	make
-	make install
-	cd redis-py-2.4
-	python setup.py install
-	cd zkpython-0.4.2
-	python setup.py install	
+	import BfdCodis
 ```
 
 ## C++ Demo
 ```c++
+	#include "BfdCodis.h"
+	
+	//param[1]  zkAddr codis依赖的zookeeper的地址
+	//param[2]  proxyPath codis在zookeeper中的proxy的path
+	//param[3]  businessID 业务分类
+	BfdCodis pool("192.168.161.22:2181", "/zk/codis/db_test/proxy", "item");
+	
+	pool.set("kk", "vv");
+	string value = pool.get("kk");
+	
+	新增加超时机制
+	int timeout = 50
+	pool.set("kk","vv",timeout)
+	注：timeout为int型，单位毫秒，两种方式均可用，在不传入timeout时，没有超时时间
 ```
 
 ## Python Demo
 ```python
-	import codis_client
+	import BfdCodis as codis
 	
-	#simple example
-	codis_client.InitFromZK('127.0.0.1:2181', '/zk/codis/db_test/proxy', "businessID")
-	print codis_client.GetProxy().set("kk", "vv")
-
-	#better example
-	#if faild, then get other proxy connection
-	codis_client.InitFromZK('127.0.0.1:2181', '/zk/codis/db_test/proxy', "businessID")
-	try:
-		ret = codis_client.GetProxy().set("kk", "vv")
-	except redis.exceptions.ConnectionError, e:
-		ret = codis_client.GetProxy().set("kk", "vv")
-
-	#best example
-	#if faild, reconnect other proxy util success
-	codis_client.InitFromZK('127.0.0.1:2181', '/zk/codis/db_test/proxy', "businessID")
-	while True:
-		try:
-			ret = codis_client.GetProxy().set("kk", "vv")
-		except redis.exceptions.ConnectionError, e:
-			continue
-		break
+	//param[1]  zkAddr codis依赖的zookeeper的地址
+	//param[2]  proxyPath codis在zookeeper中的proxy的path
+	//param[3]  businessID 业务分类
+	client = codis.BfdCodis("192.168.161.22:2181", "/zk/codis/db_test23/proxy", "item")
+	
+	print client.set("key", "value")
+	value = client.get("key")
 ```
 
 ## Java Demo
 ```Java 
-	JedisResourcePool jedisPool = new RoundRobinJedisPool("zkserver:2181", 30000, "/zk/codis/db_xxx/proxy", new JedisPoolConfig());
-	try (Jedis jedis = jedisPool.getResource()) {
-    		jedis.set("foo", "bar");
-    		String value = jedis.get("foo");
-	}
+
+	//param[1]  zkAddr codis依赖的zookeeper的地址
+	//param[2]	zkTimeout 连接zookeeper的超时时间
+	//param[3]  proxyPath codis在zookeeper中的proxy的path
+	//param[4]  config JedisPool的配置信息
+	//param[5]  timeout  从JedisPool获取连接的超时时间
+	//param[6]  businessID 业务分类
+	
+	JedisPoolConfig config = new JedisPoolConfig();
+	config.setMaxTotal(1000);
+	config.setMaxIdle(1000);
+	
+	BfdJodis bfdjodis = new BfdJodis("192.168.161.22:2181", 3000, "/zk/codis/db_test23/proxy",
+		config, 3000, "bfd");
+    String str = bfdjodis.set("k1","v1");
+	String str = bfdjodis.get("k1");
 ```	
 
