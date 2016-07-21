@@ -56,8 +56,6 @@ class BfdCodis(object):
         lock.release()
         
     def __getProxy(self):
-        #global BOOLEAN
-        #if BOOLEAN=="True":
         lock.acquire()
         self.__connPoolIndex += 1
         if self.__connPoolIndex >= len(self.__connPool):
@@ -69,20 +67,10 @@ class BfdCodis(object):
             conn = self.__connPool[self.__connPoolIndex]
             lock.release()
             return conn
-        #else:
-        #    self.__connPoolIndex += 1
-        #    if self.__connPoolIndex >= len(self.__connPool):
-        #        self.__connPoolIndex = 0
-        #    if len(self.__connPool) == 0:
-        #        return None;
-        #    else:
-        #        return self.__connPool[self.__connPoolIndex]
 
     def __watcher(self, event):
         logger.debug("watcher callback type:%s state:%s path:%s"%(event.type,event.state,event.path))
-        if event.type == "SESSION" and event.state == "CONNECTING":  
-            #self.__zk.stop()
-            #self.__zk = KazooClient(self.__zkAddr)
+        if event.type == "SESSION" and event.state == "CONNECTING":
             pass
         elif event.type == "SESSION" and event.state == "EXPIRED_SESSION":  
             self.__zk.stop()
@@ -122,8 +110,7 @@ class BfdCodis(object):
             return self.__getProxy().exists(self.__convertKey(key))
         except redis.exceptions.ConnectionError, e:
             return self.__getProxy().exists(self.__convertKey(key))
-            
-            
+
     def type(self, key):
         try:
             return self.__getProxy().type(self.__convertKey(key))
@@ -145,7 +132,7 @@ class BfdCodis(object):
             return self.__getProxy().getset(self.__convertKey(key), value)
     
     def set(self, key, value):
-	if len(value)>1048576:
+        if len(value)>1048576:
             raise MyException('the value is too bigger than 1M')
         try:
             return self.__getProxy().set(self.__convertKey(key), value)
@@ -161,7 +148,7 @@ class BfdCodis(object):
             return self.__getProxy().setnx(self.__convertKey(key), value)
 
     def setex(self, key, value, time):
-	if len(value)>1048576:
+        if len(value)>1048576:
             raise MyException('the value is too bigger than 1M')
         try:
             return self.__getProxy().setex(self.__convertKey(key), value, time)
@@ -181,8 +168,8 @@ class BfdCodis(object):
             return self.__getProxy().get(self.__convertKey(key))
         except redis.exceptions.ConnectionError, e:
             return self.__getProxy().get(self.__convertKey(key))
-			
-	def ttl(self, key):
+
+    def ttl(self, key):
         try:
             return self.__getProxy().ttl(self.__convertKey(key))
         except redis.exceptions.ConnectionError, e:
