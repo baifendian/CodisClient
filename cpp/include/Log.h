@@ -29,9 +29,9 @@ static void Log(LEVEL level, string msg, string file, int line)
 	int pid = (int)getpid();
 
 	stringstream stream;
-	stream << "redis_client_log_" << pid << ".txt";
+	stream << "codis_client_log_" << pid << ".txt";
 
-	ofstream ofs(stream.str().c_str(), ios::ate);
+	ofstream ofs(stream.str().c_str(), ios::app);
 	if (!ofs)
 	{
 		pthread_mutex_unlock(GetMutex());

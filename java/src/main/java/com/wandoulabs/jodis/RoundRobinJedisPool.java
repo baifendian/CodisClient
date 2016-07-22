@@ -108,8 +108,6 @@ public class RoundRobinJedisPool implements JedisResourcePool {
     private final JedisPoolConfig poolConfig;
 
     private final int timeout;
-    
-    private final String businessID;
 
     /**
      * Create a RoundRobinJedisPool with default timeout.
@@ -130,8 +128,8 @@ public class RoundRobinJedisPool implements JedisResourcePool {
      * @see #RoundRobinJedisPool(String, int, String, JedisPoolConfig, int)
      */
     public RoundRobinJedisPool(String zkAddr, int zkSessionTimeoutMs, String zkPath,
-            JedisPoolConfig poolConfig, String businessID) {
-        this(zkAddr, zkSessionTimeoutMs, zkPath, poolConfig, JEDIS_POOL_TIMEOUT_UNSET, businessID);
+            JedisPoolConfig poolConfig) {
+        this(zkAddr, zkSessionTimeoutMs, zkPath, poolConfig, JEDIS_POOL_TIMEOUT_UNSET);
     }
 
     /**
@@ -156,7 +154,7 @@ public class RoundRobinJedisPool implements JedisResourcePool {
      *      JedisPoolConfig, int)
      */
     public RoundRobinJedisPool(String zkAddr, int zkSessionTimeoutMs, String zkPath,
-            JedisPoolConfig poolConfig, int timeout, String businessID) {
+            JedisPoolConfig poolConfig, int timeout) {
         this(CuratorFrameworkFactory
                 .builder()
                 .connectString(zkAddr)
@@ -164,7 +162,7 @@ public class RoundRobinJedisPool implements JedisResourcePool {
                 .retryPolicy(
                         new BoundedExponentialBackoffRetryUntilElapsed(CURATOR_RETRY_BASE_SLEEP_MS,
                                 CURATOR_RETRY_MAX_SLEEP_MS, -1L)).build(), true, zkPath,
-                poolConfig, timeout, businessID);
+                poolConfig, timeout);
     }
 
     /**
@@ -181,8 +179,8 @@ public class RoundRobinJedisPool implements JedisResourcePool {
      *            same as JedisPool
      */
     public RoundRobinJedisPool(CuratorFramework curatorClient, boolean closeCurator, String zkPath,
-            JedisPoolConfig poolConfig, String businessID) {
-        this(curatorClient, closeCurator, zkPath, poolConfig, JEDIS_POOL_TIMEOUT_UNSET, businessID);
+            JedisPoolConfig poolConfig) {
+        this(curatorClient, closeCurator, zkPath, poolConfig, JEDIS_POOL_TIMEOUT_UNSET);
     }
 
     /**
@@ -201,12 +199,11 @@ public class RoundRobinJedisPool implements JedisResourcePool {
      *            timeout of JedisPool
      */
     public RoundRobinJedisPool(CuratorFramework curatorClient, boolean closeCurator, String zkPath,
-            JedisPoolConfig poolConfig, int timeout, String businessID) {
+            JedisPoolConfig poolConfig, int timeout) {
         this.poolConfig = poolConfig;
         this.timeout = timeout;
         this.curatorClient = curatorClient;
         this.closeCurator = closeCurator;
-        this.businessID = businessID;
         watcher = new PathChildrenCache(curatorClient, zkPath, true);
         watcher.getListenable().addListener(new PathChildrenCacheListener() {
 
@@ -260,10 +257,10 @@ public class RoundRobinJedisPool implements JedisResourcePool {
                     String host = hostAndPort[0];
                     int port = Integer.parseInt(hostAndPort[1]);
                     if (timeout == JEDIS_POOL_TIMEOUT_UNSET) {
-                        pool = new PooledObject(addr, new JedisPool(poolConfig, host, port, businessID));
+                        pool = new PooledObject(addr, new JedisPool(poolConfig, host, port));
                     } else {
                         pool = new PooledObject(addr,
-                                new JedisPool(poolConfig, host, port, businessID));
+                                new JedisPool(poolConfig, host, port, timeout));
                     }
                 }
                 builder.add(pool);

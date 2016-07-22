@@ -3,23 +3,13 @@ Jodis is a java client for codis based on [Jedis](https://github.com/xetorthio/j
 
 ##Features
 - Use a round robin policy to balance load to multiple codis proxies.
-- Automatic new proxy and offline proxy detection.
+- Detect proxy online and offline automatically.
 
-##How to use
-Add this to your pom.xml. We deploy jodis to https://oss.sonatype.org.
-```xml
-<dependency>
-  <groupId>com.wandoulabs.jodis</groupId>
-  <artifactId>jodis</artifactId>
-  <version>0.1.1</version>
-</dependency>
-```
+
 To use it
 ```java
-JedisResourcePool jedisPool = new RoundRobinJedisPool("zkserver:2181", 30000, "/zk/codis/db_xxx/proxy", new JedisPoolConfig(), "businessID");
-try (Jedis jedis = jedisPool.getResource()) {
-    jedis.set("foo", "bar");
-    String value = jedis.get("foo");
-}
+BfdJodis bfdjodis = new BfdJodis("192.168.161.22:2181", 1000, "/zk/codis/db_test23/proxy",
+			new JedisPoolConfig(), 1000, "bfd");
+String str = bfdjodis.set("k1","v1");
 ```
-Note: JDK7 is required to build jodis. I think JDK6 is enough to run jodis but I haven't tested it. So I recommend to use jodis with JDK7.
+Note: JDK7 is required to build and use jodis. If you want to use jodis with JDK6, you can copy the source files to your project, replace ThreadLocalRandom in BoundedExponentialBackoffRetryUntilElapsed and JDK7 specified grammar(maybe, not sure) , and then compile with JDK6.

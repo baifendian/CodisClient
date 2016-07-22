@@ -1,7 +1,8 @@
-#include "CodisClient.h"
+﻿#include "CodisClient.h"
 #include "Utils.h"
 #include "Log.h"
 #include <exception>
+#include <assert.h>
 
 using namespace bfd::codis;
 
@@ -25,6 +26,10 @@ CodisClient::CodisClient(const string& proxyIP, const int port, const string& bu
 	m_Loop = aeCreateEventLoop(64);
 
 	pthread_t AEThreadID;
+    
+    proxy_IP = proxyIP;
+
+    proxy_Port = port;
 
 	int ret=pthread_create(&AEThreadID,NULL, &AEThread,this);
 	if (ret != 0)
@@ -39,6 +44,7 @@ CodisClient::CodisClient(const string& proxyIP, const int port, const string& bu
 
 CodisClient::~CodisClient()
 {
+	//cout <<"~CodisClient()" << endl;
 	if (m_ConnPool != NULL)
 	{
 		delete m_ConnPool;
@@ -46,29 +52,29 @@ CodisClient::~CodisClient()
 	}
 }
 
-bool CodisClient::expire(string key, int seconds)
+bool CodisClient::expire(string key, int seconds, int tt)
 {
-	Reply rep = RedisCommand(Command("EXPIRE")(key)(int2string(seconds)));
+	Reply rep = RedisCommand(Command("EXPIRE")(key)(int2string(seconds)), tt);
 
 	return rep.integer()==1;
 }
 
-bool CodisClient::exists(string key)
+bool CodisClient::exists(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("EXISTS")(key));
+	Reply rep = RedisCommand(Command("EXISTS")(key), tt);
 
 	return rep.integer()==1;
 
 }
 
-int CodisClient::del(string key)
+int CodisClient::del(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("DEL")(key));
+	Reply rep = RedisCommand(Command("DEL")(key), tt);
 
 	return rep.integer();
 }
 
-int CodisClient::del(vector<string>& keys)
+int CodisClient::del(vector<string>& keys, int tt)
 {
 	Command command("DEL");
 	Reply rep;
@@ -78,63 +84,72 @@ int CodisClient::del(vector<string>& keys)
 		command(keys[i]);
 	}
 
-	rep = RedisCommand(command);
+	rep = RedisCommand(command, tt);
 
 	return rep.integer();
 }
 
-string CodisClient::type(string key)
+string CodisClient::type(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("TYPE")(key));
+	Reply rep = RedisCommand(Command("TYPE")(key), tt);
 
 	return rep.str();
 }
 
-int CodisClient::setbit(string key, int index, bool value)
+int CodisClient::setbit(string key, int index, bool value, int tt)
 {
-	Reply rep = RedisCommand(Command("SETBIT")(key)(int2string(index))(int2string(value)));
+	Reply rep = RedisCommand(Command("SETBIT")(key)(int2string(index))(int2string(value)), tt);
 
 	return rep.integer();
 }
 
-int CodisClient::getbit(string key, int index)
+int CodisClient::getbit(string key, int index, int tt)
 {
-	Reply rep = RedisCommand(Command("GETBIT")(key)(int2string(index)));
+	Reply rep = RedisCommand(Command("GETBIT")(key)(int2string(index)), tt);
 
 	return rep.integer();
 }
 
-int CodisClient::bitcount(string key)
+int CodisClient::bitcount(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("GETBIT")(key));
+	Reply rep = RedisCommand(Command("BITCOUNT")(key), tt);
 
 	return rep.integer();
 }
 
-bool CodisClient::set(string key, string value)
+bool CodisClient::set(string key, string value, int tt)
 {
-	Reply rep = RedisCommand(Command("SET")(key)(value));
+	if (value.length()>1048576){
+                throw myex;
+        }
+	Reply rep = RedisCommand(Command("SET")(key)(value), tt);
 
 	return rep.str() == "OK";
 }
 
-bool CodisClient::setnx(string key, string value)
+bool CodisClient::setnx(string key, string value, int tt)
 {
-	Reply rep = RedisCommand(Command("SETNX")(key)(value));
+        if (value.length()>1048576){
+                throw myex;
+        }
+	Reply rep = RedisCommand(Command("SETNX")(key)(value), tt);
 
 	return rep.integer() == 1;
 }
 
-bool CodisClient::setex(string key, string value, int seconds)
+bool CodisClient::setex(string key, string value, int seconds, int tt)
 {
-	Reply rep = RedisCommand(Command("SETEX")(key)(int2string(seconds))(value));
+        if (value.length()>1048576){
+                throw myex;
+        }
+	Reply rep = RedisCommand(Command("SETEX")(key)(int2string(seconds))(value), tt);
 
 	return rep.str() == "OK";
 }
 
-string CodisClient::get(string key)
+string CodisClient::get(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("GET")(key));
+	Reply rep = RedisCommand(Command("GET")(key), tt);
 
 	if (rep.error())
 	{
@@ -146,9 +161,12 @@ string CodisClient::get(string key)
 	}
 }
 
-string CodisClient::getset(string key, string value)
+string CodisClient::getset(string key, string value, int tt)
 {
-	Reply rep = RedisCommand(Command("GETSET")(key)(value));
+        if (value.length()>1048576){
+                throw myex;
+        }
+	Reply rep = RedisCommand(Command("GETSET")(key)(value), tt);
 
 	if (rep.error())
 	{
@@ -160,7 +178,7 @@ string CodisClient::getset(string key, string value)
 	}
 }
 
-vector<string> CodisClient::mget(vector<string>& keys)
+vector<string> CodisClient::mget(vector<string>& keys, int tt)
 {
 	vector<string> values;
 
@@ -171,7 +189,7 @@ vector<string> CodisClient::mget(vector<string>& keys)
 	}
 
 
-	Reply rep = RedisCommand(comm);
+	Reply rep = RedisCommand(comm, tt);
 
 	if (rep.error())
 	{
@@ -316,16 +334,19 @@ bool CodisClient::mget2(vector<string>& keys, void (*callback)(KVMap& kvs))
 //	return true;
 }
 
-bool CodisClient::mset(map<string, string>& keyvalues)
+bool CodisClient::mset(map<string, string>& keyvalues, int tt)
 {
 	Command comm("MSET");
 	map<string, string>::iterator it = keyvalues.begin();
 	for (; it!=keyvalues.end(); it++)
 	{
+		if (it->second.length()>1048576){
+                	throw myex;
+        	}
 		comm(it->first)(it->second);
 	}
 
-	Reply rep = RedisCommand(comm);
+	Reply rep = RedisCommand(comm, tt);
 
 	if (rep.error())
 	{
@@ -337,96 +358,111 @@ bool CodisClient::mset(map<string, string>& keyvalues)
 	}
 }
 
-int CodisClient::incr(string key)
+int CodisClient::incr(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("INCR")(key));
+	Reply rep = RedisCommand(Command("INCR")(key), tt);
 
 	return (rep.error()) ? 0 : rep.integer();
 }
 
-int CodisClient::decr(string key)
+int CodisClient::decr(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("DECR")(key));
+	Reply rep = RedisCommand(Command("DECR")(key), tt);
 
 	return (rep.error()) ? 0 : rep.integer();
 }
 
-int CodisClient::incrby(string key, int incr)
+int CodisClient::incrby(string key, int incr, int tt)
 {
 
-	Reply rep = RedisCommand(Command("INCRBY")(key)(int2string(incr)));
+	Reply rep = RedisCommand(Command("INCRBY")(key)(int2string(incr)), tt);
 
 	return (rep.error()) ? 0 : rep.integer();
 }
 
-int CodisClient::decrby(string key, int incr)
+int CodisClient::decrby(string key, int incr, int tt)
 {
-	Reply rep = RedisCommand(Command("DECRBY")(key)(int2string(incr)));
+	Reply rep = RedisCommand(Command("DECRBY")(key)(int2string(incr)), tt);
 
 	return (rep.error()) ? 0 : rep.integer();
 }
 
-long CodisClient::append(string key, string value)
+long CodisClient::append(string key, string value, int tt)
 {
-	Reply rep = RedisCommand(Command("APPEND")(key)(value));
+	if (value.length()>1048576){
+                throw myex;
+        }
+	Reply rep = RedisCommand(Command("APPEND")(key)(value), tt);
 
 	return rep.integer();
 }
 
-int CodisClient::lpush(string key, string value)
+int CodisClient::lpush(string key, string value, int tt)
 {
-	Reply rep = RedisCommand(Command("LPUSH")(key)(value));
+	if (value.length()>1048576){
+                throw myex;
+        }
+	Reply rep = RedisCommand(Command("LPUSH")(key)(value), tt);
 
 	return rep.integer();
 }
 
-int CodisClient::rpush(string key, string value)
+int CodisClient::rpush(string key, string value, int tt)
 {
-	Reply rep = RedisCommand(Command("RPUSH")(key)(value));
+	if (value.length()>1048576){
+                throw myex;
+        }
+	Reply rep = RedisCommand(Command("RPUSH")(key)(value), tt);
 
 	return rep.integer();
 }
 
-int CodisClient::lpush(string key, vector<string> values)
+int CodisClient::lpush(string key, vector<string> values, int tt)
 {
 	Command comm("LPUSH");
 	comm(key);
 	for (size_t i=0; i<values.size(); i++)
 	{
+		if (values[i].length()>1048576){
+        	        throw myex;
+	        }
 		comm(values[i]);
 	}
 
-	Reply rep = RedisCommand(comm);
+	Reply rep = RedisCommand(comm, tt);
 
 	return rep.integer();
 }
 
-int CodisClient::rpush(string key, vector<string> values)
+int CodisClient::rpush(string key, vector<string> values, int tt)
 {
 	Command comm("RPUSH");
 	comm(key);
 	for (size_t i=0; i<values.size(); i++)
 	{
+		if (values[i].length()>1048576){
+         	       throw myex;
+        	}
 		comm(values[i]);
 	}
 
-	Reply rep = RedisCommand(comm);
+	Reply rep = RedisCommand(comm, tt);
 
 	return rep.integer();
 }
 
 
-int CodisClient::llen(string key)
+int CodisClient::llen(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("LLEN")(key));
+	Reply rep = RedisCommand(Command("LLEN")(key), tt);
 
 	return rep.integer();
 }
 
-vector<string> CodisClient::lrange(string key, int start, int end)
+vector<string> CodisClient::lrange(string key, int start, int end, int tt)
 {
 	vector<string> values;
-	Reply rep = RedisCommand(Command("LRANGE")(key)(int2string(start))(int2string(end)));
+	Reply rep = RedisCommand(Command("LRANGE")(key)(int2string(start))(int2string(end)), tt);
 
 	for (size_t i=0; i<rep.elements().size(); i++)
 	{
@@ -436,30 +472,33 @@ vector<string> CodisClient::lrange(string key, int start, int end)
 	return values;
 }
 
-bool CodisClient::ltrim(string key, int start, int end)
+bool CodisClient::ltrim(string key, int start, int end, int tt)
 {
-	Reply rep = RedisCommand(Command("LTRIM")(key)(int2string(start))(int2string(end)));
+	Reply rep = RedisCommand(Command("LTRIM")(key)(int2string(start))(int2string(end)), tt);
 
 	return rep.str()==string("OK");
 }
 
-bool CodisClient::lset(string key, int index, string value)
+bool CodisClient::lset(string key, int index, string value, int tt)
 {
-	Reply rep = RedisCommand(Command("LSET")(key)(int2string(index))(value));
+	if (value.length()>1048576){
+                throw myex;
+        }
+	Reply rep = RedisCommand(Command("LSET")(key)(int2string(index))(value), tt);
 
 	return rep.str()==string("OK");
 }
 
-bool CodisClient::lrem(string key, int count, string value)
+bool CodisClient::lrem(string key, int count, string value, int tt)
 {
-	Reply rep = RedisCommand(Command("LREM")(key)(int2string(count))(value));
+	Reply rep = RedisCommand(Command("LREM")(key)(int2string(count))(value), tt);
 
 	return rep.integer();
 }
 
-string CodisClient::lpop(string key)
+string CodisClient::lpop(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("LPOP")(key));
+	Reply rep = RedisCommand(Command("LPOP")(key), tt);
 
 	if (rep.error())
 	{
@@ -471,9 +510,9 @@ string CodisClient::lpop(string key)
 	}
 }
 
-string CodisClient::rpop(string key)
+string CodisClient::rpop(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("RPOP")(key));
+	Reply rep = RedisCommand(Command("RPOP")(key), tt);
 
 	if (rep.error())
 	{
@@ -485,14 +524,14 @@ string CodisClient::rpop(string key)
 	}
 }
 
-bool CodisClient::sadd(string key, string member)
+bool CodisClient::sadd(string key, string member, int tt)
 {
-	Reply rep = RedisCommand(Command("SADD")(key)(member));
+	Reply rep = RedisCommand(Command("SADD")(key)(member), tt);
 
 	return rep.integer()==1;
 }
 
-int CodisClient::sadd(string key, vector<string> members)
+int CodisClient::sadd(string key, vector<string> members, int tt)
 {
 	Command comm("SADD");
 	comm(key);
@@ -501,21 +540,21 @@ int CodisClient::sadd(string key, vector<string> members)
 		comm(members[i]);
 	}
 
-	Reply rep = RedisCommand(comm);
+	Reply rep = RedisCommand(comm, tt);
 
 	return rep.integer();
 }
 
-bool CodisClient::srem(string key, string member)
+bool CodisClient::srem(string key, string member, int tt)
 {
-	Reply rep = RedisCommand(Command("SREM")(key)(member));
+	Reply rep = RedisCommand(Command("SREM")(key)(member), tt);
 
 	return rep.integer()==1;
 }
 
-string CodisClient::spop(string key)
+string CodisClient::spop(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("SPOP")(key));
+	Reply rep = RedisCommand(Command("SPOP")(key), tt);
 
 	if (rep.error())
 	{
@@ -527,9 +566,9 @@ string CodisClient::spop(string key)
 	}
 }
 
-string CodisClient::srandmember(string key)
+string CodisClient::srandmember(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("SRANDMEMBER")(key));
+	Reply rep = RedisCommand(Command("SRANDMEMBER")(key), tt);
 
 	if (rep.error())
 	{
@@ -541,24 +580,24 @@ string CodisClient::srandmember(string key)
 	}
 }
 
-int CodisClient::scard(string key)
+int CodisClient::scard(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("SCARD")(key));
+	Reply rep = RedisCommand(Command("SCARD")(key), tt);
 
 	return rep.integer();
 }
 
-bool CodisClient::sismember(string key, string member)
+bool CodisClient::sismember(string key, string member, int tt)
 {
-	Reply rep = RedisCommand(Command("SISMEMBER")(key)(member));
+	Reply rep = RedisCommand(Command("SISMEMBER")(key)(member), tt);
 
 	return rep.integer()==1;
 }
 
-vector<string> CodisClient::smembers(string key)
+vector<string> CodisClient::smembers(string key, int tt)
 {
 	vector<string> values;
-	Reply rep = RedisCommand(Command("SMEMBERS")(key));
+	Reply rep = RedisCommand(Command("SMEMBERS")(key), tt);
 
 	for (size_t i=0; i<rep.elements().size(); i++)
 	{
@@ -568,45 +607,53 @@ vector<string> CodisClient::smembers(string key)
 	return values;
 }
 
-bool CodisClient::zadd(string key, int score, string member)
+bool CodisClient::zadd(string key, int score, string member, int tt)
 {
-	Reply rep = RedisCommand(Command("ZADD")(key)(int2string(score))(member));
+	Reply rep = RedisCommand(Command("ZADD")(key)(int2string(score))(member), tt);
 
 	return rep.integer()==1;
 }
 
-bool CodisClient::zrem(string key, string member)
+bool CodisClient::zrem(string key, string member, int tt)
 {
-	Reply rep = RedisCommand(Command("ZREM")(key)(member));
+	Reply rep = RedisCommand(Command("ZREM")(key)(member), tt);
 
 	return rep.integer()==1;
 }
 
-int CodisClient::zincrby(string key, int incr, string member)
+int CodisClient::zincrby(string key, int incr, string member, int tt)
 {
-	Reply rep = RedisCommand(Command("ZINCRBY")(key)(int2string(incr))(member));
+	Reply rep = RedisCommand(Command("ZINCRBY")(key)(int2string(incr))(member), tt);
 
 	return string2int(rep.str());
 }
 
-int CodisClient::zrank(string key, string member)
+int CodisClient::zrank(string key, string member, int tt)
 {
-	Reply rep = RedisCommand(Command("ZRANK")(key)(member));
+	Reply rep = RedisCommand(Command("ZRANK")(key)(member), tt);
 
 	return rep.integer();
 }
 
-int CodisClient::zrevrank(string key, string member)
+int CodisClient::zrevrank(string key, string member, int tt)
 {
-	Reply rep = RedisCommand(Command("ZREVRANK")(key)(member));
+	Reply rep = RedisCommand(Command("ZREVRANK")(key)(member), tt);
 
 	return rep.integer();
 }
 
-vector<string> CodisClient::zrange(string key, int start, int end)
+vector<string> CodisClient::zrange(string key, int start, int end, string withscores, int tt)
 {
 	vector<string> values;
-	Reply rep = RedisCommand(Command("ZRANGE")(key)(int2string(start))(int2string(end)));
+        Reply rep;
+	if (withscores=="True")
+	{
+		rep = RedisCommand(Command("ZRANGE")(key)(int2string(start))(int2string(end))("withscores"), tt);
+	}
+	else
+	{
+		rep = RedisCommand(Command("ZRANGE")(key)(int2string(start))(int2string(end)), tt);
+	}
 
 	for (size_t i=0; i<rep.elements().size(); i++)
 	{
@@ -616,10 +663,18 @@ vector<string> CodisClient::zrange(string key, int start, int end)
 	return values;
 }
 
-vector<string> CodisClient::zrevrange(string key, int start, int end)
+vector<string> CodisClient::zrevrange(string key, int start, int end, string withscores, int tt)
 {
 	vector<string> values;
-	Reply rep = RedisCommand(Command("ZREVRANGE")(key)(int2string(start))(int2string(end)));
+	Reply rep;
+        if (withscores=="True")
+        {
+		rep = RedisCommand(Command("ZREVRANGE")(key)(int2string(start))(int2string(end))("withscores"), tt);
+	}
+	else
+	{
+		rep = RedisCommand(Command("ZREVRANGE")(key)(int2string(start))(int2string(end)), tt);
+	}
 
 	for (size_t i=0; i<rep.elements().size(); i++)
 	{
@@ -629,10 +684,18 @@ vector<string> CodisClient::zrevrange(string key, int start, int end)
 	return values;
 }
 
-vector<string> CodisClient::zrangebyscore(string key, int min, int max)
+vector<string> CodisClient::zrangebyscore(string key, string min, string max, string withscores, int tt)
 {
 	vector<string> values;
-	Reply rep = RedisCommand(Command("ZRANGEBYSCORE")(key)(int2string(min))(int2string(max)));
+	Reply rep;
+        if (withscores=="True")
+        {
+		rep = RedisCommand(Command("ZRANGEBYSCORE")(key)(min)(max)("withscores"), tt);
+	}
+	else
+	{
+		rep = RedisCommand(Command("ZRANGEBYSCORE")(key)(min)(max), tt);
+	}
 
 	for (size_t i=0; i<rep.elements().size(); i++)
 	{
@@ -642,51 +705,75 @@ vector<string> CodisClient::zrangebyscore(string key, int min, int max)
 	return values;
 }
 
-int CodisClient::zcount(string key, int min, int max)
+vector<string> CodisClient::zrevrangebyscore(string key, string min, string max, string withscores, int tt)
 {
-	Reply rep = RedisCommand(Command("ZCOUNT")(key)(int2string(min))(int2string(max)));
+	vector<string> values;
+	Reply rep;
+        if (withscores=="True")
+        {
+		rep = RedisCommand(Command("ZREVRANGEBYSCORE")(key)(min)(max)("withscores"), tt);
+	}
+	else
+	{
+		rep = RedisCommand(Command("ZREVRANGEBYSCORE")(key)(min)(max), tt);
+	}
+
+	for (size_t i=0; i<rep.elements().size(); i++)
+	{
+		values.push_back(rep.elements()[i].str());
+	}
+
+	return values;
+}
+
+int CodisClient::zcount(string key, int min, int max, int tt)
+{
+	Reply rep = RedisCommand(Command("ZCOUNT")(key)(int2string(min))(int2string(max)), tt);
 
 	return rep.integer();
 }
 
-int CodisClient::zcard(string key)
+int CodisClient::zcard(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("ZCARD")(key));
+	Reply rep = RedisCommand(Command("ZCARD")(key), tt);
 
 	return rep.integer();
 }
 
-int CodisClient::zscore(string key, string member)
+int CodisClient::zscore(string key, string member, int tt)
 {
-	Reply rep = RedisCommand(Command("ZSCORE")(key)(member));
+	Reply rep = RedisCommand(Command("ZSCORE")(key)(member), tt);
 
 	return string2int(rep.str());
 }
 
-int CodisClient::zremrangebyrank(string key, int min, int max)
+int CodisClient::zremrangebyrank(string key, int min, int max, int tt)
 {
-	Reply rep = RedisCommand(Command("ZREMRANGEBYRANK")(key)(int2string(min))(int2string(max)));
+	Reply rep = RedisCommand(Command("ZREMRANGEBYRANK")(key)(int2string(min))(int2string(max)), tt);
 
 	return rep.integer();
 }
 
-int CodisClient::zremrangebyscore(string key, int min, int max)
+int CodisClient::zremrangebyscore(string key, int min, int max, int tt)
 {
-	Reply rep = RedisCommand(Command("ZREMRANGEBYSCORE")(key)(int2string(min))(int2string(max)));
+	Reply rep = RedisCommand(Command("ZREMRANGEBYSCORE")(key)(int2string(min))(int2string(max)), tt);
 
 	return rep.integer();
 }
 
-bool CodisClient::hset(string key, string field, string value)
+bool CodisClient::hset(string key, string field, string value, int tt)
 {
-	Reply rep = RedisCommand(Command("HSET")(key)(field)(value));
+	if (value.length()>1048576){
+                throw myex;
+        }
+	Reply rep = RedisCommand(Command("HSET")(key)(field)(value), tt);
 
 	return rep.integer();
 }
 
-string CodisClient::hget(string key, string field)
+string CodisClient::hget(string key, string field, int tt)
 {
-	Reply rep = RedisCommand(Command("HGET")(key)(field));
+	Reply rep = RedisCommand(Command("HGET")(key)(field), tt);
 
 	if (rep.error())
 	{
@@ -698,7 +785,7 @@ string CodisClient::hget(string key, string field)
 	}
 }
 
-vector<string> CodisClient::hmget(string key, vector<string>& fields)
+vector<string> CodisClient::hmget(string key, vector<string>& fields, int tt)
 {
 	vector<string> values;
 	Command command("HMGET");
@@ -708,7 +795,7 @@ vector<string> CodisClient::hmget(string key, vector<string>& fields)
 		command(fields[i]);
 	}
 
-	Reply rep = RedisCommand(command);
+	Reply rep = RedisCommand(command, tt);
 
 	for (size_t i=0; i<rep.elements().size(); i++)
 	{
@@ -718,7 +805,7 @@ vector<string> CodisClient::hmget(string key, vector<string>& fields)
 	return values;
 }
 
-bool CodisClient::hmset(string key, vector<string>& fields, vector<string>& values)
+bool CodisClient::hmset(string key, vector<string>& fields, vector<string>& values, int tt)
 {
 	if (fields.size() != values.size()) return false;
 	if (fields.empty()) return false;
@@ -728,46 +815,49 @@ bool CodisClient::hmset(string key, vector<string>& fields, vector<string>& valu
 
 	for (size_t i=0; i<fields.size(); i++)
 	{
+		if (values[i].length()>1048576){
+                	throw myex;
+        	}
 		command(fields[i])(values[i]);
 	}
 
-	Reply rep = RedisCommand(command);
+	Reply rep = RedisCommand(command, tt);
 
 	return rep.str()==string("OK");
 }
 
-int CodisClient::hincrby(string key, string field, int incr)
+int CodisClient::hincrby(string key, string field, int incr, int tt)
 {
-	Reply rep = RedisCommand(Command("HINCRBY")(key)(field)(int2string(incr)));
+	Reply rep = RedisCommand(Command("HINCRBY")(key)(field)(int2string(incr)), tt);
 
 	return rep.integer();
 }
 
-bool CodisClient::hexists(string key, string field)
+bool CodisClient::hexists(string key, string field, int tt)
 {
-	Reply rep = RedisCommand(Command("HEXISTS")(key)(field));
+	Reply rep = RedisCommand(Command("HEXISTS")(key)(field), tt);
 
 	return rep.integer()==1;
 }
 
-bool CodisClient::hdel(string key, string field)
+bool CodisClient::hdel(string key, string field, int tt)
 {
-	Reply rep = RedisCommand(Command("HDEL")(key)(field));
+	Reply rep = RedisCommand(Command("HDEL")(key)(field), tt);
 
 	return rep.integer()==1;
 }
 
-int CodisClient::hlen(string key)
+int CodisClient::hlen(string key, int tt)
 {
-	Reply rep = RedisCommand(Command("HLEN")(key));
+	Reply rep = RedisCommand(Command("HLEN")(key), tt);
 
 	return rep.integer();
 }
 
-vector<string> CodisClient::hkeys(string key)
+vector<string> CodisClient::hkeys(string key, int tt)
 {
 	vector<string> keys;
-	Reply rep = RedisCommand(Command("HKEYS")(key));
+	Reply rep = RedisCommand(Command("HKEYS")(key), tt);
 
 	for (size_t i=0; i<rep.elements().size(); i++)
 	{
@@ -777,10 +867,10 @@ vector<string> CodisClient::hkeys(string key)
 	return keys;
 }
 
-vector<string> CodisClient::hvals(string key)
+vector<string> CodisClient::hvals(string key, int tt)
 {
 	vector<string> values;
-	Reply rep = RedisCommand(Command("HVALS")(key));
+	Reply rep = RedisCommand(Command("HVALS")(key), tt);
 
 	for (size_t i=0; i<rep.elements().size(); i++)
 	{
@@ -790,9 +880,9 @@ vector<string> CodisClient::hvals(string key)
 	return values;
 }
 
-bool CodisClient::hgetall(string key, vector<string>& fields, vector<string>& values)
+bool CodisClient::hgetall(string key, vector<string>& fields, vector<string>& values, int tt)
 {
-	Reply rep = RedisCommand(Command("HGETALL")(key));
+	Reply rep = RedisCommand(Command("HGETALL")(key), tt);
 
 	if (rep.error()) return false;
 
@@ -805,7 +895,7 @@ bool CodisClient::hgetall(string key, vector<string>& fields, vector<string>& va
 	return true;
 }
 
-Reply CodisClient::RedisCommand(const vector<string>& command)
+Reply CodisClient::RedisCommand(const vector<string>& command, int tt)
 {
 	if (command.size() < 2)
 	{
@@ -868,7 +958,6 @@ Reply CodisClient::RedisCommand(const vector<string>& command)
 	    argv.push_back(innerCommand[i].c_str());
 	    arglen.push_back(innerCommand[i].size());
 	}
-
 	if (!m_ConnPool)
 	{
 		LOG(ERROR, "connpool is null!");
@@ -876,11 +965,8 @@ Reply CodisClient::RedisCommand(const vector<string>& command)
 		reply.SetErrorMessage("Can not fetch client from pool!!!");
 		return reply;
 	}
-
 	//----
-
 	redisContext* redis = m_ConnPool->borrowItem();
-
 	if (!redis)
 	{
 	    LOG(ERROR, "contetx is null!");
@@ -890,52 +976,72 @@ Reply CodisClient::RedisCommand(const vector<string>& command)
 	}
 
 	redisReply *reply;
+	int ts = tt/1000;
+	int tm = tt%1000;
+	struct timeval tv = {ts, tm*1000};
+        if (redisSetTimeout(redis,tv) != REDIS_OK){
+	    redisFree(redis);
+            redis = NULL;
+            redis = m_ConnPool->create();
+            if (redis == NULL)
+            {
+                LOG(ERROR, "reconnect faild!");
+                Reply reply;
+                reply.SetErrorMessage("reconnect faild!");
+                return reply;
+            }
+	    redisSetTimeout(redis,tv);
+	};
 	reply = (redisReply*)redisCommandArgv(redis, argv.size(), &argv[0], &arglen[0]);
 	// 服务端会主动关闭掉不活跃的连接，这里处理重练并重新发送命令
-	if (!reply)
-	{
-	    redisFree(redis);
-	    redis = NULL;
-	    redis = m_ConnPool->create();
-	    if (redis == NULL)
-	    {
-	    	LOG(ERROR, "reconnect faild!");
-	    	Reply reply;
-	    	reply.SetErrorMessage("reconnect faild!");
-	    	return reply;
-	    }
-	    reply = (redisReply*)redisCommandArgv(redis, argv.size(), &argv[0], &arglen[0]);
-	}
+	//if (!reply)
+	//{
+	//    redisFree(redis);
+	//    redis = NULL;
+	//    redis = m_ConnPool->create();
+	//    if (redis == NULL)
+	//    {
+	//    	LOG(ERROR, "reconnect faild!");
+	//    	Reply reply;
+	//    	reply.SetErrorMessage("reconnect faild!");
+	//    	return reply;
+	//    }
+        //    assert(redisSetTimeout(redis,tv) == REDIS_OK);
+	//    reply = (redisReply*)redisCommandArgv(redis, argv.size(), &argv[0], &arglen[0]);
+	//}
 
-	// 重连后依然失败则返回
+	//// 重连后依然失败则返回
+	m_ConnPool->returnItem(redis);
 	if (!reply)
 	{
-		redisFree(redis);
-		redis = NULL;
 		Reply reply;
 		reply.SetErrorMessage("Do Command faild.");
 		return reply;
 	}
 
 	// 如果命令发送成功则将连接放回到连接池
-	m_ConnPool->returnItem(redis);
+	//if (m_ConnPool != NULL) {
+	//}
+	//else {
+//			cout << "m_ConnPool is NULL" << endl;
+//	}
 	Reply ret = Reply(reply);
 	freeReplyObject(reply);
 	return ret;
 }
 
-Reply CodisClient::RedisCommand(Command& command)
+Reply CodisClient::RedisCommand(Command& command, int tt)
 {
-	return RedisCommand(command.args());
+	return RedisCommand(command.args(), tt);
 }
 
 vector<Reply> CodisClient::RedisCommands(vector<Command>& commands)
 {
 	vector<Reply> replys;
-
+        int tt = 0;
 	for (size_t i=0; i<commands.size(); i++)
 	{
-		Reply reply = RedisCommand(commands[i]);
+		Reply reply = RedisCommand(commands[i], tt);
 		replys.push_back(reply);
 	}
 

@@ -5,7 +5,7 @@
 
 #ifndef BFD_REDIS_SCOPEDLOCK_H
 #define BFD_REDIS_SCOPEDLOCK_H
-
+using namespace std;
 class ScopedLock
 {
 public:

@@ -10,13 +10,18 @@ RoundRobinCodisPool::RoundRobinCodisPool(const string& zookeeperAddr, const stri
 				 m_ProxyPath(proxyPath),m_Mutex(PTHREAD_MUTEX_INITIALIZER),
 				 proxyIndex(-1),m_BusinessID(businessID)
 {
-	m_Zh = zookeeper_init(zookeeperAddr.c_str(), proxy_watcher, 10000, NULL, this, 0);
-	if (m_Zh == NULL)
-	{
-		LOG(ERROR, "connect zookeeper error! zookeeperAddr="+zookeeperAddr);
-		exit(1);
+    m_Zh = zookeeper_init(zookeeperAddr.c_str(), proxy_watcher, 10000, NULL, this, 0);
+    int cnt = 0;
+    while (zoo_state(m_Zh)!=ZOO_CONNECTED_STATE && cnt<10000)
+    {
+        usleep(30000);
+        cnt++;
 	}
-
+    if (cnt == 10000)
+    {
+        LOG(ERROR, "connect zookeeper error! zookeeperAddr="+zookeeperAddr);
+        exit(1);
+    }
 	Init(m_Zh, proxyPath);
 }
 
@@ -24,6 +29,7 @@ RoundRobinCodisPool::RoundRobinCodisPool(const string& zookeeperAddr, const stri
 
 RoundRobinCodisPool::~RoundRobinCodisPool()
 {
+	ScopedLock lock(m_Mutex);
 	for (size_t i=0; i<m_Proxys.size(); i++)
 	{
 		if (m_Proxys[i] != NULL)
@@ -51,7 +57,7 @@ CodisClient* RoundRobinCodisPool::GetProxy()
 			index = -1;
 			proxyIndex = -1;
 		}
-	}
+	//}
 
 	if (index == -1)
 	{
@@ -60,6 +66,7 @@ CodisClient* RoundRobinCodisPool::GetProxy()
 	else
 	{
 		return m_Proxys[index];
+	}
 	}
 }
 
@@ -101,7 +108,7 @@ vector<pair<string, int> > RoundRobinCodisPool::GetProxyInfos(zhandle_t *(&zh), 
 		  stringstream proxyFullPath;
 		  proxyFullPath << proxyPath << "/" << *pstr;
 		  string node_data = ZkGet(zh, proxyFullPath.str());
-		  if (!reader.parse(node_data, state, false))
+		  if (!reader.parse(node_data.c_str(), state, false))
 		  {
 			  stringstream stream;
 			  stream << "data format json is faild [path: " << proxyFullPath << "][data:" << node_data << "]\n";
@@ -145,14 +152,13 @@ void RoundRobinCodisPool::InitProxyConns(vector<pair<string, int> >& proxyInfos)
 	{
 		m_Proxys.swap(proxys);
 		m_ProxyInfos = proxyInfos;
-	}
-
-	for (size_t i=0; i<proxys.size(); i++)
-	{
-		if (proxys[i] != NULL)
+		for (size_t i=0; i<proxys.size(); i++)
 		{
-			delete proxys[i];
-			proxys[i] = NULL;
+			if (proxys[i] != NULL)
+			{
+				delete proxys[i];
+				proxys[i] = NULL;
+			}
 		}
 	}
 }
@@ -195,26 +201,39 @@ string RoundRobinCodisPool::ZkGet(zhandle_t *(&zh), const string &path, bool wat
 void RoundRobinCodisPool::proxy_watcher(zhandle_t *zh, int type, int state, const char *path, void *context)
 {
 	RoundRobinCodisPool* ptr = reinterpret_cast<RoundRobinCodisPool*>(context);
-
 	if ((type==ZOO_SESSION_EVENT) && (state==ZOO_CONNECTING_STATE))
 	{
 		zookeeper_close(ptr->m_Zh);
 		ptr->m_Zh = zookeeper_init(ptr->m_ZookeeperAddr.c_str(), proxy_watcher, 10000, NULL, context, 0);
-		if (ptr->m_Zh == NULL)
-		{
-			LOG(ERROR, "connect zookeeper error! zookeeperAddr="+ptr->m_ZookeeperAddr);
-			exit(1);
-		}
+        int cnt = 0;
+        while (zoo_state(ptr->m_Zh)!=ZOO_CONNECTED_STATE && cnt<10000)
+	    {
+	        usleep(30000);
+            cnt++;
+	    }
+        if (cnt == 10000)
+        {
+            LOG(ERROR, "connect zookeeper error! zookeeperAddr="+ptr->m_ZookeeperAddr);
+            exit(1);
+        }
+		ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
 	}
 	else if ((type==ZOO_SESSION_EVENT) && (state==ZOO_EXPIRED_SESSION_STATE))
 	{
 		zookeeper_close(ptr->m_Zh);
 		ptr->m_Zh = zookeeper_init(ptr->m_ZookeeperAddr.c_str(), proxy_watcher, 10000, NULL, context, 0);
-		if (ptr->m_Zh == NULL)
-		{
-			LOG(ERROR, "connect zookeeper error! zookeeperAddr="+ptr->m_ZookeeperAddr);
-			exit(1);
-		}
+        int cnt = 0;
+        while (zoo_state(ptr->m_Zh)!=ZOO_CONNECTED_STATE && cnt<10000)
+	    {
+	        usleep(30000);
+            cnt++;
+	    }
+        if (cnt == 10000)
+        {
+            LOG(ERROR, "connect zookeeper error! zookeeperAddr="+ptr->m_ZookeeperAddr);
+            exit(1);
+        }
+		ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
 	}
 	else if ((type==ZOO_SESSION_EVENT) && (state==ZOO_CONNECTED_STATE))
 	{
@@ -222,19 +241,20 @@ void RoundRobinCodisPool::proxy_watcher(zhandle_t *zh, int type, int state, cons
 	}
 	else if ((state==ZOO_CONNECTED_STATE) && (type==ZOO_CHANGED_EVENT))
 	{
-		ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
+		//ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
 	}
 	else if ((state==ZOO_CONNECTED_STATE) && (type==ZOO_DELETED_EVENT))
 	{
-		ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
+		//ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
 	}
 	else if ((state==ZOO_CONNECTED_STATE) && (type==ZOO_CHILD_EVENT))
 	{
+		sleep(5);
 		ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
 	}
 	else if ((state==ZOO_CONNECTED_STATE) && (type==ZOO_CREATED_EVENT))
 	{
-		ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
+		//ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
 	}
 	else
 	{
