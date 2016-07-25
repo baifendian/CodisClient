@@ -1,6 +1,6 @@
 # Codis-Client
 ## 介绍
-	codis-client是codis集群的客户端,支持C++,Java,Python
+codis-client是codis集群的客户端,支持C++,Java,Python, java客户端是基于[jodis](https://github.com/CodisLabs/jodis)写的，codis-client在每个key前面加了businessID以区分不同的业务。
 
 ## 环境依赖 (Python)
 	1.redis-py-2.7.2
