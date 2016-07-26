@@ -994,21 +994,21 @@ Reply CodisClient::RedisCommand(const vector<string>& command, int tt)
 	};
 	reply = (redisReply*)redisCommandArgv(redis, argv.size(), &argv[0], &arglen[0]);
 	// 服务端会主动关闭掉不活跃的连接，这里处理重练并重新发送命令
-	//if (!reply)
-	//{
-	//    redisFree(redis);
-	//    redis = NULL;
-	//    redis = m_ConnPool->create();
-	//    if (redis == NULL)
-	//    {
-	//    	LOG(ERROR, "reconnect faild!");
-	//    	Reply reply;
-	//    	reply.SetErrorMessage("reconnect faild!");
-	//    	return reply;
-	//    }
-        //    assert(redisSetTimeout(redis,tv) == REDIS_OK);
-	//    reply = (redisReply*)redisCommandArgv(redis, argv.size(), &argv[0], &arglen[0]);
-	//}
+	if (!reply)
+	{
+	    redisFree(redis);
+	    redis = NULL;
+	    redis = m_ConnPool->create();
+	    if (redis == NULL)
+	    {
+	    	LOG(ERROR, "reconnect faild!");
+	    	Reply reply;
+	    	reply.SetErrorMessage("reconnect faild!");
+	    	return reply;
+	    }
+	    redisSetTimeout(redis,tv);
+	    reply = (redisReply*)redisCommandArgv(redis, argv.size(), &argv[0], &arglen[0]);
+	}
 
 	//// 重连后依然失败则返回
 	m_ConnPool->returnItem(redis);
