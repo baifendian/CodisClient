@@ -139,7 +139,7 @@ vector<pair<string, int> > RoundRobinCodisPool::GetProxyInfos(zhandle_t *(&zh), 
 	  return proxys;
 }
 
-void RoundRobinCodisPool::InitProxyConns(vector<pair<string, int> >& proxyInfos)
+void RoundRobinCodisPool::InitProxyConns(const vector<pair<string, int> >& proxyInfos)
 {
 	vector<CodisClient*> proxys;
 	for (size_t i=0; i<proxyInfos.size(); i++)
@@ -147,18 +147,17 @@ void RoundRobinCodisPool::InitProxyConns(vector<pair<string, int> >& proxyInfos)
 		CodisClient *proxy = new CodisClient(proxyInfos[i].first, proxyInfos[i].second, m_BusinessID);
 		proxys.push_back(proxy);
 	}
-
-	ScopedLock lock(m_Mutex);
 	{
+		ScopedLock lock(m_Mutex);
 		m_Proxys.swap(proxys);
 		m_ProxyInfos = proxyInfos;
-		for (size_t i=0; i<proxys.size(); i++)
+	}
+	for (size_t i=0; i<proxys.size(); i++)
+	{
+		if (proxys[i] != NULL)
 		{
-			if (proxys[i] != NULL)
-			{
-				delete proxys[i];
-				proxys[i] = NULL;
-			}
+			delete proxys[i];
+			proxys[i] = NULL;
 		}
 	}
 }
@@ -200,40 +199,43 @@ string RoundRobinCodisPool::ZkGet(zhandle_t *(&zh), const string &path, bool wat
 
 void RoundRobinCodisPool::proxy_watcher(zhandle_t *zh, int type, int state, const char *path, void *context)
 {
+        stringstream stream;
+        stream << "zkevent type=" << type << "stats=" << state;
+	LOG(INFO, stream.str());
 	RoundRobinCodisPool* ptr = reinterpret_cast<RoundRobinCodisPool*>(context);
 	if ((type==ZOO_SESSION_EVENT) && (state==ZOO_CONNECTING_STATE))
 	{
-		zookeeper_close(ptr->m_Zh);
-		ptr->m_Zh = zookeeper_init(ptr->m_ZookeeperAddr.c_str(), proxy_watcher, 10000, NULL, context, 0);
-        int cnt = 0;
-        while (zoo_state(ptr->m_Zh)!=ZOO_CONNECTED_STATE && cnt<10000)
-	    {
-	        usleep(30000);
-            cnt++;
-	    }
-        if (cnt == 10000)
-        {
-            LOG(ERROR, "connect zookeeper error! zookeeperAddr="+ptr->m_ZookeeperAddr);
-            exit(1);
-        }
-		ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
+//		zookeeper_close(ptr->m_Zh);
+//		ptr->m_Zh = zookeeper_init(ptr->m_ZookeeperAddr.c_str(), proxy_watcher, 10000, NULL, context, 0);
+//        int cnt = 0;
+//        while (zoo_state(ptr->m_Zh)!=ZOO_CONNECTED_STATE && cnt<10000)
+//	    {
+//	        usleep(30000);
+//            cnt++;
+//	    }
+//        if (cnt == 10000)
+//        {
+//            LOG(ERROR, "connect zookeeper error! zookeeperAddr="+ptr->m_ZookeeperAddr);
+//            exit(1);
+//        }
+//		ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
 	}
 	else if ((type==ZOO_SESSION_EVENT) && (state==ZOO_EXPIRED_SESSION_STATE))
 	{
-		zookeeper_close(ptr->m_Zh);
-		ptr->m_Zh = zookeeper_init(ptr->m_ZookeeperAddr.c_str(), proxy_watcher, 10000, NULL, context, 0);
-        int cnt = 0;
-        while (zoo_state(ptr->m_Zh)!=ZOO_CONNECTED_STATE && cnt<10000)
-	    {
-	        usleep(30000);
-            cnt++;
-	    }
-        if (cnt == 10000)
-        {
-            LOG(ERROR, "connect zookeeper error! zookeeperAddr="+ptr->m_ZookeeperAddr);
-            exit(1);
-        }
-		ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
+//		zookeeper_close(ptr->m_Zh);
+//		ptr->m_Zh = zookeeper_init(ptr->m_ZookeeperAddr.c_str(), proxy_watcher, 10000, NULL, context, 0);
+//        int cnt = 0;
+//        while (zoo_state(ptr->m_Zh)!=ZOO_CONNECTED_STATE && cnt<10000)
+//	    {
+//	        usleep(30000);
+//            cnt++;
+//	    }
+//        if (cnt == 10000)
+//        {
+//            LOG(ERROR, "connect zookeeper error! zookeeperAddr="+ptr->m_ZookeeperAddr);
+//            exit(1);
+//        }
+//		ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
 	}
 	else if ((type==ZOO_SESSION_EVENT) && (state==ZOO_CONNECTED_STATE))
 	{

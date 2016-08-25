@@ -38,7 +38,7 @@ private:
 	static void proxy_watcher(zhandle_t *zh, int type, int state, const char *path, void *context);
 	string ZkGet(zhandle_t *(&zh), const string &path, bool watch=true);
 	vector<pair<string, int> > GetProxyInfos(zhandle_t *(&zh), const string& proxyPath);
-	void InitProxyConns(vector<pair<string, int> >& proxyInfos);
+	void InitProxyConns(const vector<pair<string, int> >& proxyInfos);
 
 };
 

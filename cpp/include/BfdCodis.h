@@ -126,8 +126,7 @@ public:
 	  Reply RedisCommand(Command& command, int tt = 0);
 	  vector<Reply> RedisCommands(vector<Command>& commands);
 private:
-	  BfdCodis(const BfdCodis&);
-	  BfdCodis& operator=(const BfdCodis&);
+	  //BfdCodis& operator=(const BfdCodis&);
 	  RoundRobinCodisPool *m_Pool;
 };
 };

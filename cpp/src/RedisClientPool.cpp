@@ -35,26 +35,28 @@ redisContext* RedisClientPool::borrowItem()
 	redisContext* rt = NULL;
 	{
 		ScopedLock lock(unUsedMutex_);
+		while (!unUsed_.empty())
 		{
-		    while (!unUsed_.empty())
-		    {
-			    rt = unUsed_.front();
-			    unUsed_.pop_front();
-			    if (rt->err == REDIS_OK)
-			    {
-				    return rt;
-			    }
-			    else
-			    {
-				    redisFree(rt);
-				    continue;
-			    }
-		    }
-		    rt = create();
-		    if (rt != NULL)
-	        {
-		        used_++;
-	        }
+			rt = unUsed_.front();
+			unUsed_.pop_front();
+			if (rt->err == REDIS_OK)
+			{
+				break;
+			}
+			else
+			{
+				redisFree(rt);
+				rt = NULL;
+				continue;
+			}
+		}
+		if (rt == NULL)
+		{
+			rt = create();
+			if (rt != NULL)
+	        	{
+				used_++;
+	 	      	}
 		}
 	}
 	return rt;
@@ -92,9 +94,11 @@ redisAsyncContext* RedisClientPool::borrowItemAsync(aeEventLoop *loop)
 
 void RedisClientPool::returnItem(redisContext* item)
 {
-	ScopedLock lock(unUsedMutex_);
-	unUsed_.push_back(item);
-	used_--;
+	{
+		ScopedLock lock(unUsedMutex_);
+		unUsed_.push_back(item);
+		used_--;
+	}
 }
 // async
 void RedisClientPool::returnItemAsync(redisAsyncContext* item)
@@ -173,6 +177,7 @@ redisAsyncContext* RedisClientPool::createAsync(aeEventLoop *loop)
 
 bool RedisClientPool::Reconnect(redisContext* rc)
 {
+	ScopedLock lock(unUsedAsyncMutex_);
 	Destroy(rc);
 	try
 	{
