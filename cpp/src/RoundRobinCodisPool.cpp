@@ -205,37 +205,37 @@ void RoundRobinCodisPool::proxy_watcher(zhandle_t *zh, int type, int state, cons
 	RoundRobinCodisPool* ptr = reinterpret_cast<RoundRobinCodisPool*>(context);
 	if ((type==ZOO_SESSION_EVENT) && (state==ZOO_CONNECTING_STATE))
 	{
-//		zookeeper_close(ptr->m_Zh);
-//		ptr->m_Zh = zookeeper_init(ptr->m_ZookeeperAddr.c_str(), proxy_watcher, 10000, NULL, context, 0);
-//        int cnt = 0;
-//        while (zoo_state(ptr->m_Zh)!=ZOO_CONNECTED_STATE && cnt<10000)
-//	    {
-//	        usleep(30000);
-//            cnt++;
-//	    }
-//        if (cnt == 10000)
-//        {
-//            LOG(ERROR, "connect zookeeper error! zookeeperAddr="+ptr->m_ZookeeperAddr);
-//            exit(1);
-//        }
-//		ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
+		zookeeper_close(ptr->m_Zh);
+		ptr->m_Zh = zookeeper_init(ptr->m_ZookeeperAddr.c_str(), proxy_watcher, 10000, NULL, context, 0);
+        int cnt = 0;
+        while (zoo_state(ptr->m_Zh)!=ZOO_CONNECTED_STATE && cnt<10000)
+	    {
+	        usleep(30000);
+            cnt++;
+	    }
+        if (cnt == 10000)
+        {
+            LOG(ERROR, "connect zookeeper error! zookeeperAddr="+ptr->m_ZookeeperAddr);
+            exit(1);
+        }
+		ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
 	}
 	else if ((type==ZOO_SESSION_EVENT) && (state==ZOO_EXPIRED_SESSION_STATE))
 	{
-//		zookeeper_close(ptr->m_Zh);
-//		ptr->m_Zh = zookeeper_init(ptr->m_ZookeeperAddr.c_str(), proxy_watcher, 10000, NULL, context, 0);
-//        int cnt = 0;
-//        while (zoo_state(ptr->m_Zh)!=ZOO_CONNECTED_STATE && cnt<10000)
-//	    {
-//	        usleep(30000);
-//            cnt++;
-//	    }
-//        if (cnt == 10000)
-//        {
-//            LOG(ERROR, "connect zookeeper error! zookeeperAddr="+ptr->m_ZookeeperAddr);
-//            exit(1);
-//        }
-//		ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
+		zookeeper_close(ptr->m_Zh);
+		ptr->m_Zh = zookeeper_init(ptr->m_ZookeeperAddr.c_str(), proxy_watcher, 10000, NULL, context, 0);
+        int cnt = 0;
+        while (zoo_state(ptr->m_Zh)!=ZOO_CONNECTED_STATE && cnt<10000)
+	    {
+	        usleep(30000);
+            cnt++;
+	    }
+        if (cnt == 10000)
+        {
+            LOG(ERROR, "connect zookeeper error! zookeeperAddr="+ptr->m_ZookeeperAddr);
+            exit(1);
+        }
+		ptr->Init(ptr->m_Zh, ptr->m_ProxyPath);
 	}
 	else if ((type==ZOO_SESSION_EVENT) && (state==ZOO_CONNECTED_STATE))
 	{
