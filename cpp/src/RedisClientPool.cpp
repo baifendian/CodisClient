@@ -94,11 +94,9 @@ redisAsyncContext* RedisClientPool::borrowItemAsync(aeEventLoop *loop)
 
 void RedisClientPool::returnItem(redisContext* item)
 {
-	{
-		ScopedLock lock(unUsedMutex_);
-		unUsed_.push_back(item);
-		used_--;
-	}
+    ScopedLock lock(unUsedMutex_);
+    unUsed_.push_back(item);
+    used_--;
 }
 // async
 void RedisClientPool::returnItemAsync(redisAsyncContext* item)
@@ -177,7 +175,7 @@ redisAsyncContext* RedisClientPool::createAsync(aeEventLoop *loop)
 
 bool RedisClientPool::Reconnect(redisContext* rc)
 {
-	ScopedLock lock(unUsedAsyncMutex_);
+	ScopedLock lock(unUsedMutex_);
 	Destroy(rc);
 	try
 	{
