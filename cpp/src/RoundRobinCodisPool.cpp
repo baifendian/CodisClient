@@ -42,32 +42,9 @@ RoundRobinCodisPool::~RoundRobinCodisPool()
 
 CodisClient* RoundRobinCodisPool::GetProxy()
 {
-	int index = -1;
-	ScopedLock lock(m_Mutex);
-	{
-		index = ++proxyIndex;
-		if (proxyIndex >= m_Proxys.size())
-		{
-			proxyIndex = 0;
-			index = 0;
-		}
-
-		if (m_Proxys.size() == 0)
-		{
-			index = -1;
-			proxyIndex = -1;
-		}
-	//}
-
-	if (index == -1)
-	{
-		return NULL;
-	}
-	else
-	{
-		return m_Proxys[index];
-	}
-	}
+    ScopedLock lock(m_Mutex);
+    int idx = ++proxyIndex % m_Proxys.size();
+    return m_Proxys[idx];
 }
 
 void RoundRobinCodisPool::Init(zhandle_t *(&zh), const string& proxyPath)
