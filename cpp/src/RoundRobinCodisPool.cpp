@@ -42,32 +42,9 @@ RoundRobinCodisPool::~RoundRobinCodisPool()
 
 CodisClient* RoundRobinCodisPool::GetProxy()
 {
-	int index = -1;
-	ScopedLock lock(m_Mutex);
-	{
-		index = ++proxyIndex;
-		if (proxyIndex >= m_Proxys.size())
-		{
-			proxyIndex = 0;
-			index = 0;
-		}
-
-		if (m_Proxys.size() == 0)
-		{
-			index = -1;
-			proxyIndex = -1;
-		}
-	//}
-
-	if (index == -1)
-	{
-		return NULL;
-	}
-	else
-	{
-		return m_Proxys[index];
-	}
-	}
+    ScopedLock lock(m_Mutex);
+    int idx = ++proxyIndex % m_Proxys.size();
+    return m_Proxys[idx];
 }
 
 void RoundRobinCodisPool::Init(zhandle_t *(&zh), const string& proxyPath)
@@ -139,7 +116,7 @@ vector<pair<string, int> > RoundRobinCodisPool::GetProxyInfos(zhandle_t *(&zh), 
 	  return proxys;
 }
 
-void RoundRobinCodisPool::InitProxyConns(vector<pair<string, int> >& proxyInfos)
+void RoundRobinCodisPool::InitProxyConns(const vector<pair<string, int> >& proxyInfos)
 {
 	vector<CodisClient*> proxys;
 	for (size_t i=0; i<proxyInfos.size(); i++)
@@ -147,18 +124,17 @@ void RoundRobinCodisPool::InitProxyConns(vector<pair<string, int> >& proxyInfos)
 		CodisClient *proxy = new CodisClient(proxyInfos[i].first, proxyInfos[i].second, m_BusinessID);
 		proxys.push_back(proxy);
 	}
-
-	ScopedLock lock(m_Mutex);
 	{
+		ScopedLock lock(m_Mutex);
 		m_Proxys.swap(proxys);
 		m_ProxyInfos = proxyInfos;
-		for (size_t i=0; i<proxys.size(); i++)
+	}
+	for (size_t i=0; i<proxys.size(); i++)
+	{
+		if (proxys[i] != NULL)
 		{
-			if (proxys[i] != NULL)
-			{
-				delete proxys[i];
-				proxys[i] = NULL;
-			}
+			delete proxys[i];
+			proxys[i] = NULL;
 		}
 	}
 }
@@ -200,6 +176,9 @@ string RoundRobinCodisPool::ZkGet(zhandle_t *(&zh), const string &path, bool wat
 
 void RoundRobinCodisPool::proxy_watcher(zhandle_t *zh, int type, int state, const char *path, void *context)
 {
+        stringstream stream;
+        stream << "zkevent type=" << type << "stats=" << state;
+	LOG(INFO, stream.str());
 	RoundRobinCodisPool* ptr = reinterpret_cast<RoundRobinCodisPool*>(context);
 	if ((type==ZOO_SESSION_EVENT) && (state==ZOO_CONNECTING_STATE))
 	{

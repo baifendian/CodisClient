@@ -13,6 +13,7 @@
 #include "Reply.h"
 #include "Command.h"
 #include "RedisClientPool.h"
+#include "pthread.h"
 #include <sys/time.h>
 
 using namespace std;
@@ -162,8 +163,9 @@ private:
 	  aeEventLoop *m_Loop;
 	  RedisClientPool *m_ConnPool;
 	  string m_BID;
-      string proxy_IP;
-      string proxy_Port;
+	  pthread_rwlock_t p_rwlock;
+	  string proxy_IP;
+	  string proxy_Port;
 
 private:
 	  static void* AEThread(void *arg);

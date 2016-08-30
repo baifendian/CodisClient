@@ -3,6 +3,7 @@
 #include "Log.h"
 #include <exception>
 #include <assert.h>
+#include <pthread.h>
 
 using namespace bfd::codis;
 
@@ -15,11 +16,11 @@ struct AsyncInfo
 
 
 
-
-
 CodisClient::CodisClient(const string& proxyIP, const int port, const string& businessID)
 {
 	m_ConnPool = new RedisClientPool(proxyIP, port);
+	
+	pthread_rwlock_init(&p_rwlock, NULL);
 
 	m_BID = businessID;
 
@@ -27,9 +28,9 @@ CodisClient::CodisClient(const string& proxyIP, const int port, const string& bu
 
 	pthread_t AEThreadID;
     
-    proxy_IP = proxyIP;
+	proxy_IP = proxyIP;
 
-    proxy_Port = port;
+	proxy_Port = port;
 
 	int ret=pthread_create(&AEThreadID,NULL, &AEThread,this);
 	if (ret != 0)
@@ -44,12 +45,15 @@ CodisClient::CodisClient(const string& proxyIP, const int port, const string& bu
 
 CodisClient::~CodisClient()
 {
-	//cout <<"~CodisClient()" << endl;
-	if (m_ConnPool != NULL)
+	pthread_rwlock_wrlock(&p_rwlock);
 	{
-		delete m_ConnPool;
-		m_ConnPool = NULL;
+		if (m_ConnPool != NULL)
+		{
+			delete m_ConnPool;
+			m_ConnPool = NULL;
+		}
 	}
+	pthread_rwlock_unlock(&p_rwlock);
 }
 
 bool CodisClient::expire(string key, int seconds, int tt)
@@ -149,11 +153,12 @@ bool CodisClient::setex(string key, string value, int seconds, int tt)
 
 string CodisClient::get(string key, int tt)
 {
+        //return "";
 	Reply rep = RedisCommand(Command("GET")(key), tt);
 
 	if (rep.error())
 	{
-		return "";
+        	return "";
 	}
 	else
 	{
@@ -180,6 +185,12 @@ string CodisClient::getset(string key, string value, int tt)
 
 vector<string> CodisClient::mget(vector<string>& keys, int tt)
 {
+//        vector<string> values;
+//        for (size_t i=0; i<keys.size(); i++)
+//        {
+//               values.push_back("");
+//        }
+//        return values;
 	vector<string> values;
 
 	Command comm("MGET");
@@ -965,69 +976,57 @@ Reply CodisClient::RedisCommand(const vector<string>& command, int tt)
 		reply.SetErrorMessage("Can not fetch client from pool!!!");
 		return reply;
 	}
-	//----
-	redisContext* redis = m_ConnPool->borrowItem();
-	if (!redis)
-	{
-	    LOG(ERROR, "contetx is null!");
-	    Reply reply;
-	    reply.SetErrorMessage("context is NULL !!");
-	    return reply;
-	}
+    pthread_rwlock_rdlock(&p_rwlock);
+    redisContext* redis = m_ConnPool->borrowItem();
+    if (!redis)
+    {
+        LOG(ERROR, "contetx is null!");
+        Reply reply;
+        reply.SetErrorMessage("context is NULL !!");
+        pthread_rwlock_unlock(&p_rwlock);
+        return reply;
+    }
 
-	redisReply *reply;
-	int ts = tt/1000;
-	int tm = tt%1000;
-	struct timeval tv = {ts, tm*1000};
-        if (redisSetTimeout(redis,tv) != REDIS_OK){
-	    redisFree(redis);
+    redisReply *reply;
+    int ts = tt/1000;
+    int tm = tt%1000;
+    struct timeval tv = {ts, tm*1000};
+    redisSetTimeout(redis,tv);
+    reply = (redisReply*)redisCommandArgv(redis, argv.size(), &argv[0], &arglen[0]);
+    // 服务端会主动关闭掉不活跃的连接，这里处理重练并重新发送命令
+    if (!reply)
+    {
+        bool result = m_ConnPool->Reconnect(redis);
+        if (result)
+        {
+            redisSetTimeout(redis,tv);
+            reply = (redisReply*)redisCommandArgv(redis, argv.size(), &argv[0], &arglen[0]);
+        }
+        else
+        {
+            //redisFree(redis);
             redis = NULL;
-            redis = m_ConnPool->create();
-            if (redis == NULL)
-            {
-                LOG(ERROR, "reconnect faild!");
-                Reply reply;
-                reply.SetErrorMessage("reconnect faild!");
-                return reply;
-            }
-	    redisSetTimeout(redis,tv);
-	};
-	reply = (redisReply*)redisCommandArgv(redis, argv.size(), &argv[0], &arglen[0]);
-	// 服务端会主动关闭掉不活跃的连接，这里处理重练并重新发送命令
-	if (!reply)
-	{
-	    redisFree(redis);
-	    redis = NULL;
-	    redis = m_ConnPool->create();
-	    if (redis == NULL)
-	    {
-	    	LOG(ERROR, "reconnect faild!");
-	    	Reply reply;
-	    	reply.SetErrorMessage("reconnect faild!");
-	    	return reply;
-	    }
-	    redisSetTimeout(redis,tv);
-	    reply = (redisReply*)redisCommandArgv(redis, argv.size(), &argv[0], &arglen[0]);
-	}
+            LOG(ERROR, "reconnect faild!");
+            Reply reply;
+            reply.SetErrorMessage("reconnect faild!");
+            pthread_rwlock_unlock(&p_rwlock);
+            return reply;
+        }
+    }
 
-	//// 重连后依然失败则返回
-	m_ConnPool->returnItem(redis);
-	if (!reply)
-	{
-		Reply reply;
-		reply.SetErrorMessage("Do Command faild.");
-		return reply;
-	}
-
-	// 如果命令发送成功则将连接放回到连接池
-	//if (m_ConnPool != NULL) {
-	//}
-	//else {
-//			cout << "m_ConnPool is NULL" << endl;
-//	}
-	Reply ret = Reply(reply);
-	freeReplyObject(reply);
-	return ret;
+    //// 重连后依然失败则返回
+    if (!reply)
+    {
+        Reply reply;
+        reply.SetErrorMessage("Do Command faild.");
+        pthread_rwlock_unlock(&p_rwlock);
+        return reply;
+    }
+    m_ConnPool->returnItem(redis);
+    Reply ret = Reply(reply);
+    freeReplyObject(reply);
+    pthread_rwlock_unlock(&p_rwlock);
+    return ret;
 }
 
 Reply CodisClient::RedisCommand(Command& command, int tt)
